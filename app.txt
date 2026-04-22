@@ -3,3 +3,4 @@ Version: 1.0.0
 This is a placeholder app used to test CI/CD versioning, tagging, and promotion flows.
 
 little change
+little change 2
