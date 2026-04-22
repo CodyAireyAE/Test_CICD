@@ -20,27 +20,68 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Verify test tag exists
+      - name: Validate version format
         run: |
           VERSION="${{ github.event.inputs.version }}"
-          echo "Checking for test/v$VERSION tag..."
-          if ! git tag --list | grep -q "^test/v${VERSION}$"; then
-            echo "============================================="
-            echo " BLOCKED: test/v$VERSION tag does not exist!"
-            echo " You must promote to test first."
-            echo "============================================="
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "ERROR: Version must be semver (e.g. 1.2.0), got: $VERSION"
             exit 1
           fi
-          echo "test/v$VERSION exists ✓ — promotion allowed"
+          echo "Version format valid ✓"
 
-      - name: Verify dev tag exists (full chain)
+      - name: Check not already promoted to prod
         run: |
           VERSION="${{ github.event.inputs.version }}"
-          if ! git tag --list | grep -q "^dev/v${VERSION}$"; then
-            echo "WARNING: dev/v$VERSION not found — tag chain incomplete"
-          else
-            echo "dev/v$VERSION exists ✓ — full chain verified"
+          if git tag --list | grep -q "^prod/v${VERSION}$"; then
+            echo "ERROR: prod/v$VERSION already exists — this version is already in production."
+            exit 1
           fi
+          echo "Not yet in prod ✓"
+
+      - name: Verify full promotion chain
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          FAILED=0
+
+          echo "Verifying promotion chain for v$VERSION..."
+          echo ""
+
+          # Check dev tag
+          if git tag --list | grep -q "^dev/v${VERSION}$"; then
+            echo "  ✓ dev/v$VERSION"
+          else
+            echo "  ✗ dev/v$VERSION — MISSING"
+            FAILED=1
+          fi
+
+          # Check test tag
+          if git tag --list | grep -q "^test/v${VERSION}$"; then
+            echo "  ✓ test/v$VERSION"
+          else
+            echo "  ✗ test/v$VERSION — MISSING"
+            FAILED=1
+          fi
+
+          echo ""
+
+          if [ $FAILED -eq 1 ]; then
+            echo "============================================="
+            echo " BLOCKED: Incomplete promotion chain!"
+            echo " A version must go dev → test → prod."
+            echo "============================================="
+            echo ""
+            echo "Versions available for prod promotion (have both dev + test tags):"
+            for tag in $(git tag --list 'test/v*' | sed 's|test/v||'); do
+              if git tag --list | grep -q "^dev/v${tag}$"; then
+                if ! git tag --list | grep -q "^prod/v${tag}$"; then
+                  echo "  $tag"
+                fi
+              fi
+            done
+            exit 1
+          fi
+
+          echo "Full chain verified ✓ — promotion allowed"
 
   deploy-prod:
     needs: gate-check

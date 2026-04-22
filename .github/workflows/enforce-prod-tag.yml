@@ -17,16 +17,32 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Verify matching test tag exists
+      - name: Verify full promotion chain exists
         run: |
           PROD_TAG="${GITHUB_REF#refs/tags/}"
           VERSION="${PROD_TAG#prod/}"
           echo "Prod tag pushed: $PROD_TAG"
-          echo "Checking for test/$VERSION..."
+          FAILED=0
 
+          echo "Checking dev/$VERSION..."
+          if ! git tag --list | grep -q "^dev/${VERSION}$"; then
+            echo "  ✗ dev/$VERSION — MISSING"
+            FAILED=1
+          else
+            echo "  ✓ dev/$VERSION"
+          fi
+
+          echo "Checking test/$VERSION..."
           if ! git tag --list | grep -q "^test/${VERSION}$"; then
+            echo "  ✗ test/$VERSION — MISSING"
+            FAILED=1
+          else
+            echo "  ✓ test/$VERSION"
+          fi
+
+          if [ $FAILED -eq 1 ]; then
             echo "============================================="
-            echo " VIOLATION: test/$VERSION does not exist!"
+            echo " VIOLATION: Incomplete promotion chain!"
             echo " Removing unauthorized prod tag: $PROD_TAG"
             echo "============================================="
             git push origin --delete "$PROD_TAG"
@@ -34,4 +50,4 @@ jobs:
             exit 1
           fi
 
-          echo "test/$VERSION exists ✓ — prod tag is valid"
+          echo "Full chain verified ✓ — prod tag is valid"

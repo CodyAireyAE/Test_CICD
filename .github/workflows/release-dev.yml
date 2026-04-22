@@ -31,6 +31,9 @@ jobs:
         run: |
           if git ls-remote --tags origin | grep -q "refs/tags/dev/v${{ github.event.inputs.version }}$"; then
             echo "ERROR: dev/v${{ github.event.inputs.version }} already exists!"
+            echo ""
+            echo "Existing dev versions:"
+            git ls-remote --tags origin | grep 'refs/tags/dev/v' | sed 's|.*refs/tags/dev/v||' | sort -V
             exit 1
           fi
           echo "Tag is available ✓"
