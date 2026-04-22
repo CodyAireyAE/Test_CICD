@@ -1,0 +1,37 @@
+name: Enforce Prod Tag Policy
+
+# Fires when any prod/ tag is pushed
+on:
+  push:
+    tags:
+      - "prod/*"
+
+permissions:
+  contents: write
+
+jobs:
+  enforce:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify matching test tag exists
+        run: |
+          PROD_TAG="${GITHUB_REF#refs/tags/}"
+          VERSION="${PROD_TAG#prod/}"
+          echo "Prod tag pushed: $PROD_TAG"
+          echo "Checking for test/$VERSION..."
+
+          if ! git tag --list | grep -q "^test/${VERSION}$"; then
+            echo "============================================="
+            echo " VIOLATION: test/$VERSION does not exist!"
+            echo " Removing unauthorized prod tag: $PROD_TAG"
+            echo "============================================="
+            git push origin --delete "$PROD_TAG"
+            echo "Tag $PROD_TAG deleted ✓"
+            exit 1
+          fi
+
+          echo "test/$VERSION exists ✓ — prod tag is valid"

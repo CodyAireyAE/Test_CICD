@@ -1,0 +1,49 @@
+name: CI Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate app.txt exists
+        run: |
+          echo "=== CI Build ==="
+          if [ ! -f app.txt ]; then
+            echo "ERROR: app.txt not found!"
+            exit 1
+          fi
+          echo "app.txt found ✓"
+          cat app.txt
+
+      - name: Run fake tests
+        run: |
+          echo "Running tests..."
+          echo "All tests passed ✓"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-artifact
+          path: app.txt
+
+      # -------------------------------------------------------
+      # AZURE PLACEHOLDER — uncomment when ready to deploy
+      # -------------------------------------------------------
+      # - name: Login to Azure
+      #   uses: azure/login@v2
+      #   with:
+      #     creds: ${{ secrets.AZURE_CREDENTIALS }}
+      #
+      # - name: Deploy to Azure (build slot / staging)
+      #   uses: azure/webapps-deploy@v3
+      #   with:
+      #     app-name: ${{ vars.AZURE_APP_NAME }}
+      #     slot-name: staging
+      #     package: .

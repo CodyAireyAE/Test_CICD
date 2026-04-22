@@ -1,0 +1,65 @@
+name: Deploy to Test
+
+# Fires automatically when a version tag is pushed
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  deploy-test:
+    runs-on: ubuntu-latest
+    environment: test
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+
+      - name: Extract version
+        id: version
+        run: |
+          VERSION="${GITHUB_REF#refs/tags/v}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Deploying v$VERSION to TEST"
+
+      - name: Simulate test deployment
+        run: |
+          echo "==========================================="
+          echo " DEPLOYING TO TEST ENVIRONMENT"
+          echo " Version: v${{ steps.version.outputs.version }}"
+          echo "==========================================="
+          echo "Uploading app.txt..."
+          cat app.txt
+          echo ""
+          echo "Test deployment complete ✓"
+
+      # -------------------------------------------------------
+      # AZURE PLACEHOLDER — uncomment when ready
+      # -------------------------------------------------------
+      # - name: Login to Azure
+      #   uses: azure/login@v2
+      #   with:
+      #     creds: ${{ secrets.AZURE_CREDENTIALS }}
+      #
+      # - name: Deploy to Azure Test
+      #   uses: azure/webapps-deploy@v3
+      #   with:
+      #     app-name: ${{ vars.AZURE_APP_NAME }}
+      #     slot-name: test
+      #     package: .
+      #
+      # - name: Run smoke tests against test
+      #   run: |
+      #     curl -f https://${{ vars.AZURE_APP_NAME }}-test.azurewebsites.net/health || exit 1
+
+      - name: Stamp test tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          TAG="test/v${{ steps.version.outputs.version }}"
+          git tag "$TAG"
+          git push origin "$TAG"
+          echo "Tagged $TAG ✓"
