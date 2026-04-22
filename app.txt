@@ -1,5 +1,5 @@
 Hello from CICD_FlowTest!
-Version: 1.2.0
+Version: 1.3.0-dev
 This is a placeholder app used to test CI/CD versioning, tagging, and promotion flows.
 
 little change
