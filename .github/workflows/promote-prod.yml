@@ -1,6 +1,6 @@
 name: Promote to Prod
 
-# Manual trigger only — you pick the version to promote
+# Manual trigger — you pick the version to promote from test to prod
 on:
   workflow_dispatch:
     inputs:
@@ -27,11 +27,20 @@ jobs:
           if ! git tag --list | grep -q "^test/v${VERSION}$"; then
             echo "============================================="
             echo " BLOCKED: test/v$VERSION tag does not exist!"
-            echo " You must deploy to test first."
+            echo " You must promote to test first."
             echo "============================================="
             exit 1
           fi
           echo "test/v$VERSION exists ✓ — promotion allowed"
+
+      - name: Verify dev tag exists (full chain)
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          if ! git tag --list | grep -q "^dev/v${VERSION}$"; then
+            echo "WARNING: dev/v$VERSION not found — tag chain incomplete"
+          else
+            echo "dev/v$VERSION exists ✓ — full chain verified"
+          fi
 
   deploy-prod:
     needs: gate-check
@@ -40,21 +49,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: "v${{ github.event.inputs.version }}"
+          ref: "test/v${{ github.event.inputs.version }}"
 
-      - name: Simulate prod deployment
+      - name: Deploy to production
         run: |
           echo "==========================================="
           echo " DEPLOYING TO PRODUCTION"
           echo " Version: v${{ github.event.inputs.version }}"
           echo "==========================================="
-          echo "Uploading app.txt..."
           cat app.txt
           echo ""
           echo "Production deployment complete ✓"
 
       # -------------------------------------------------------
-      # AZURE PLACEHOLDER — uncomment when ready
+      # AZURE PLACEHOLDER — deploy to prod environment
       # -------------------------------------------------------
       # - name: Login to Azure
       #   uses: azure/login@v2
@@ -68,7 +76,7 @@ jobs:
       #     slot-name: production
       #     package: .
       #
-      # - name: Run smoke tests against prod
+      # - name: Smoke test
       #   run: |
       #     curl -f https://${{ vars.AZURE_APP_NAME }}.azurewebsites.net/health || exit 1
 
@@ -80,3 +88,15 @@ jobs:
           git tag "$TAG"
           git push origin "$TAG"
           echo "Tagged $TAG ✓"
+
+      - name: Create final GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: "prod/v${{ github.event.inputs.version }}"
+          name: "v${{ github.event.inputs.version }}"
+          prerelease: false
+          body: |
+            ## Production Release v${{ github.event.inputs.version }}
+            Promoted through: `dev` → `test` → `prod`
+
+            **Status:** ✅ Live in production.

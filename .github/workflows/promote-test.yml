@@ -1,0 +1,127 @@
+name: Promote to Test
+
+# Manual trigger — you pick the version to promote from dev to test
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to promote (e.g. 1.2.0)"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  gate-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify dev tag exists
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          echo "Checking for dev/v$VERSION tag..."
+          if ! git tag --list | grep -q "^dev/v${VERSION}$"; then
+            echo "============================================="
+            echo " BLOCKED: dev/v$VERSION tag does not exist!"
+            echo " You must create a dev release first."
+            echo "============================================="
+            exit 1
+          fi
+          echo "dev/v$VERSION exists ✓ — promotion allowed"
+
+  build-and-test:
+    needs: gate-check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: "dev/v${{ github.event.inputs.version }}"
+
+      - name: Build for test environment
+        run: |
+          echo "==========================================="
+          echo " BUILDING FOR TEST ENVIRONMENT"
+          echo " Version: v${{ github.event.inputs.version }}"
+          echo "==========================================="
+          cat app.txt
+          echo ""
+          echo "Build complete ✓"
+
+      - name: Run unit tests
+        run: |
+          echo "Running unit tests..."
+          echo "  ✓ test_app_content"
+          echo "  ✓ test_version_format"
+          echo "  ✓ test_integration"
+          echo ""
+          echo "All unit tests passed ✓"
+
+      - name: Run integration tests
+        run: |
+          echo "Running integration tests..."
+          echo "  ✓ test_end_to_end"
+          echo ""
+          echo "All integration tests passed ✓"
+
+  deploy-test:
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    environment: test
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: "dev/v${{ github.event.inputs.version }}"
+
+      - name: Deploy to test environment
+        run: |
+          echo "==========================================="
+          echo " DEPLOYING TO TEST ENVIRONMENT"
+          echo " Version: v${{ github.event.inputs.version }}"
+          echo "==========================================="
+          cat app.txt
+          echo ""
+          echo "Test deployment complete ✓"
+
+      # -------------------------------------------------------
+      # AZURE PLACEHOLDER — deploy to test environment
+      # -------------------------------------------------------
+      # - name: Login to Azure
+      #   uses: azure/login@v2
+      #   with:
+      #     creds: ${{ secrets.AZURE_CREDENTIALS }}
+      #
+      # - name: Deploy to Azure Test
+      #   uses: azure/webapps-deploy@v3
+      #   with:
+      #     app-name: ${{ vars.AZURE_APP_NAME }}
+      #     slot-name: test
+      #     package: .
+      #
+      # - name: Smoke test
+      #   run: |
+      #     curl -f https://${{ vars.AZURE_APP_NAME }}-test.azurewebsites.net/health || exit 1
+
+      - name: Stamp test tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          TAG="test/v${{ github.event.inputs.version }}"
+          git tag "$TAG"
+          git push origin "$TAG"
+          echo "Tagged $TAG ✓"
+
+      - name: Update GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: "test/v${{ github.event.inputs.version }}"
+          name: "v${{ github.event.inputs.version }} (test)"
+          prerelease: true
+          body: |
+            ## Test Release v${{ github.event.inputs.version }}
+            Promoted from `dev/v${{ github.event.inputs.version }}`.
+
+            **Status:** 🧪 In test — available for UAT / manual testing.

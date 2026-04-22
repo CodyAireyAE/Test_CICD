@@ -1,6 +1,6 @@
 name: Enforce Prod Tag Policy
 
-# Fires when any prod/ tag is pushed
+# Fires when any prod/ tag is pushed — deletes it if test/ tag doesn't exist
 on:
   push:
     tags:

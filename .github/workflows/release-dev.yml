@@ -1,0 +1,92 @@
+name: Create Dev Release
+
+# Manual trigger — creates a dev/vX.X.X tag and GitHub Release
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release (e.g. 1.2.0)"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  create-dev-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate version format
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "ERROR: Version must be semver (e.g. 1.2.0), got: $VERSION"
+            exit 1
+          fi
+          echo "Version $VERSION is valid ✓"
+
+      - name: Check tag doesn't already exist
+        run: |
+          if git ls-remote --tags origin | grep -q "refs/tags/dev/v${{ github.event.inputs.version }}$"; then
+            echo "ERROR: dev/v${{ github.event.inputs.version }} already exists!"
+            exit 1
+          fi
+          echo "Tag is available ✓"
+
+      - name: Stamp version into app.txt
+        run: |
+          sed -i "s/^Version: .*/Version: ${{ github.event.inputs.version }}-dev/" app.txt
+          cat app.txt
+
+      - name: Commit version bump
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add app.txt
+          git commit -m "release: bump version to v${{ github.event.inputs.version }}-dev"
+          git push
+
+      - name: Create dev tag
+        run: |
+          git tag "dev/v${{ github.event.inputs.version }}"
+          git push origin "dev/v${{ github.event.inputs.version }}"
+
+      - name: Build for dev environment
+        run: |
+          echo "==========================================="
+          echo " BUILDING FOR DEV ENVIRONMENT"
+          echo " Version: v${{ github.event.inputs.version }}"
+          echo "==========================================="
+          cat app.txt
+          echo ""
+          echo "Build complete ✓"
+
+      # -------------------------------------------------------
+      # AZURE PLACEHOLDER — deploy to dev environment
+      # -------------------------------------------------------
+      # - name: Login to Azure
+      #   uses: azure/login@v2
+      #   with:
+      #     creds: ${{ secrets.AZURE_CREDENTIALS }}
+      #
+      # - name: Deploy to Azure Dev
+      #   uses: azure/webapps-deploy@v3
+      #   with:
+      #     app-name: ${{ vars.AZURE_APP_NAME }}
+      #     slot-name: dev
+      #     package: .
+
+      - name: Create GitHub Release (pre-release)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: "dev/v${{ github.event.inputs.version }}"
+          name: "v${{ github.event.inputs.version }} (dev)"
+          prerelease: true
+          body: |
+            ## Dev Release v${{ github.event.inputs.version }}
+            Created from commit ${{ github.sha }} on branch `${{ github.ref_name }}`.
+
+            **Status:** 🔧 Development — needs manual testing before promoting to test.
+          files: app.txt

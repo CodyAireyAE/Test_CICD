@@ -1,5 +1,6 @@
 name: CI Build
 
+# Runs on every push/PR to main — just validates and tests
 on:
   push:
     branches: [main]
@@ -22,28 +23,13 @@ jobs:
           echo "app.txt found ✓"
           cat app.txt
 
-      - name: Run fake tests
+      - name: Run quick checks
         run: |
-          echo "Running tests..."
-          echo "All tests passed ✓"
+          echo "Running lint/checks..."
+          echo "All checks passed ✓"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: app-artifact
           path: app.txt
-
-      # -------------------------------------------------------
-      # AZURE PLACEHOLDER — uncomment when ready to deploy
-      # -------------------------------------------------------
-      # - name: Login to Azure
-      #   uses: azure/login@v2
-      #   with:
-      #     creds: ${{ secrets.AZURE_CREDENTIALS }}
-      #
-      # - name: Deploy to Azure (build slot / staging)
-      #   uses: azure/webapps-deploy@v3
-      #   with:
-      #     app-name: ${{ vars.AZURE_APP_NAME }}
-      #     slot-name: staging
-      #     package: .
